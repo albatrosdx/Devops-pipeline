@@ -1,0 +1,208 @@
+name: PR - 本番環境チェックデプロイ検証
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened]
+
+jobs:
+  validate-delta:
+    name: Delta差分を本番へ検証デプロイ (Check-Only)
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write  # PRへのコメント投稿に必要
+
+    steps:
+      # -------------------------------------------------------
+      # 1. ソースコード取得 (全履歴が必要: delta比較のため)
+      # -------------------------------------------------------
+      - name: Checkout source code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # -------------------------------------------------------
+      # 2. Salesforce CLI インストール
+      # -------------------------------------------------------
+      - name: Install Salesforce CLI
+        run: |
+          npm install --global @salesforce/cli@latest
+          sf --version
+
+      # -------------------------------------------------------
+      # 3. sfdx-git-delta プラグインインストール
+      # -------------------------------------------------------
+      - name: Install sfdx-git-delta plugin
+        run: |
+          echo y | sf plugins install sfdx-git-delta
+          sf sgd --version
+
+      # -------------------------------------------------------
+      # 4. JWT認証で本番組織へ接続
+      #    必要なSecrets:
+      #      SALESFORCE_JWT_SECRET_KEY : 接続アプリの秘密鍵(PEM形式)
+      #      SALESFORCE_CONSUMER_KEY   : 接続アプリのコンシューマーキー
+      #      SALESFORCE_USERNAME       : 本番組織のユーザー名
+      #      SALESFORCE_INSTANCE_URL   : 本番組織のURL (例: https://login.salesforce.com)
+      # -------------------------------------------------------
+      - name: Authenticate to Production org (JWT)
+        run: |
+          echo "${{ secrets.SALESFORCE_JWT_SECRET_KEY }}" > server.key
+          sf org login jwt \
+            --client-id "${{ secrets.SALESFORCE_CONSUMER_KEY }}" \
+            --jwt-key-file server.key \
+            --username "${{ secrets.SALESFORCE_USERNAME }}" \
+            --instance-url "${{ secrets.SALESFORCE_INSTANCE_URL }}" \
+            --alias production \
+            --set-default
+          rm server.key
+
+      # -------------------------------------------------------
+      # 5. sfdx-git-delta で差分パッケージを生成
+      #    PRブランチ と mainブランチの共通祖先 を比較
+      # -------------------------------------------------------
+      - name: Generate delta package with sfdx-git-delta
+        id: sgd
+        run: |
+          # PR base branch の最新コミットを取得
+          git fetch origin ${{ github.base_ref }} --depth=1 2>/dev/null || true
+
+          # 共通祖先 (分岐点) を特定
+          FROM=$(git merge-base HEAD origin/${{ github.base_ref }})
+          echo "from_sha=$FROM" >> $GITHUB_OUTPUT
+          echo "to_sha=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+          echo ""
+          echo "=== Delta範囲 ==="
+          echo "FROM (分岐点): $FROM"
+          echo "TO   (PRの先端): $(git rev-parse HEAD)"
+          echo ""
+
+          # delta ディレクトリへ差分パッケージを生成
+          mkdir -p delta
+          sf sgd source delta \
+            --to "HEAD" \
+            --from "$FROM" \
+            --output "./delta" \
+            --source-dir "force-app"
+
+          echo ""
+          echo "=== 生成された package.xml ==="
+          cat delta/package/package.xml
+
+          # 破壊的変更の確認
+          if [ -f "delta/destructiveChanges/destructiveChanges.xml" ]; then
+            echo ""
+            echo "=== 破壊的変更 (destructiveChanges.xml) ==="
+            cat delta/destructiveChanges/destructiveChanges.xml
+          fi
+
+      # -------------------------------------------------------
+      # 6. 差分の有無を判定
+      # -------------------------------------------------------
+      - name: Check if delta has Salesforce metadata changes
+        id: check-delta
+        run: |
+          if grep -q "<members>" delta/package/package.xml 2>/dev/null; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "Salesforceメタデータの変更を検出しました。検証デプロイを実行します。"
+          else
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "Salesforceメタデータの変更はありません。検証デプロイをスキップします。"
+          fi
+
+      # -------------------------------------------------------
+      # 7. Apex (ApexClass / ApexTrigger) の変更有無でテストレベルを決定
+      #      含まれる場合 → RunLocalTests
+      #      含まれない場合 → NoTestRun
+      # -------------------------------------------------------
+      - name: Detect Apex changes and set test level
+        id: detect-apex
+        if: steps.check-delta.outputs.has_changes == 'true'
+        run: |
+          if grep -qE "<name>ApexClass</name>|<name>ApexTrigger</name>" delta/package/package.xml 2>/dev/null; then
+            echo "has_apex=true"  >> $GITHUB_OUTPUT
+            echo "test_level=RunLocalTests" >> $GITHUB_OUTPUT
+            echo "Apexの変更を検出 → テストレベル: RunLocalTests"
+          else
+            echo "has_apex=false" >> $GITHUB_OUTPUT
+            echo "test_level=NoTestRun" >> $GITHUB_OUTPUT
+            echo "Apexの変更なし  → テストレベル: NoTestRun"
+          fi
+
+      # -------------------------------------------------------
+      # 8. 本番へチェックデプロイ (Check-Only = 検証のみ)
+      # -------------------------------------------------------
+      - name: Validate deploy to Production (Check-Only)
+        if: steps.check-delta.outputs.has_changes == 'true'
+        id: deploy-validate
+        run: |
+          # 破壊的変更ファイルの存在確認
+          DESTRUCTIVE_FLAG=""
+          if [ -f "delta/destructiveChanges/destructiveChanges.xml" ] && \
+             grep -q "<members>" "delta/destructiveChanges/destructiveChanges.xml" 2>/dev/null; then
+            DESTRUCTIVE_FLAG="--post-destructive-changes delta/destructiveChanges/destructiveChanges.xml"
+            echo "破壊的変更を含めて検証します"
+          fi
+
+          TEST_LEVEL="${{ steps.detect-apex.outputs.test_level }}"
+          echo "テストレベル: $TEST_LEVEL"
+
+          sf project deploy validate \
+            --manifest "delta/package/package.xml" \
+            --test-level "$TEST_LEVEL" \
+            --target-org production \
+            --wait 60 \
+            --verbose \
+            $DESTRUCTIVE_FLAG
+
+      # -------------------------------------------------------
+      # 9. 結果をPRにコメント投稿
+      # -------------------------------------------------------
+      - name: Post validation result to PR
+        if: always() && steps.check-delta.outputs.has_changes == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const success = '${{ steps.deploy-validate.outcome }}' === 'success';
+            const fromSha = '${{ steps.sgd.outputs.from_sha }}'.substring(0, 7);
+            const toSha = '${{ steps.sgd.outputs.to_sha }}'.substring(0, 7);
+            const hasApex = '${{ steps.detect-apex.outputs.has_apex }}' === 'true';
+            const testLevel = '${{ steps.detect-apex.outputs.test_level }}';
+
+            const icon = success ? '✅' : '❌';
+            const status = success ? '**検証成功**' : '**検証失敗**';
+            const testInfo = hasApex
+              ? `${testLevel} (Apexの変更を検出したためテスト実施)`
+              : `${testLevel} (Apexの変更なしのためテストスキップ)`;
+
+            const body = [
+              `## ${icon} Salesforce 本番環境 チェックデプロイ結果`,
+              '',
+              `| 項目 | 値 |`,
+              `|------|-----|`,
+              `| ステータス | ${status} |`,
+              `| 差分範囲 | \`${fromSha}\` → \`${toSha}\` |`,
+              `| テストレベル | ${testInfo} |`,
+              `| デプロイ種別 | Check-Only (検証のみ・実反映なし) |`,
+              '',
+              success
+                ? '本PRの変更は本番環境への検証デプロイに成功しました。マージ後に実デプロイを実施できます。'
+                : '⚠️ 検証デプロイが失敗しました。ログを確認して問題を修正してください。',
+            ].join('\n');
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body,
+            });
+
+      # -------------------------------------------------------
+      # 10. 変更なしの場合
+      # -------------------------------------------------------
+      - name: No Salesforce changes detected
+        if: steps.check-delta.outputs.has_changes == 'false'
+        run: |
+          echo "このPRにSalesforceメタデータの変更はありません。"
+          echo "検証デプロイをスキップしました。"
