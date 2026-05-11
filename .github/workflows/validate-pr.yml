@@ -11,7 +11,8 @@ jobs:
     name: Delta差分を本番へ検証デプロイ (Check-Only)
     runs-on: ubuntu-latest
     permissions:
-      pull-requests: write  # PRへのコメント投稿に必要
+      contents: read         # actions/checkout でコードを取得するために必要
+      pull-requests: write   # PRへのコメント投稿に必要
 
     steps:
       # -------------------------------------------------------
