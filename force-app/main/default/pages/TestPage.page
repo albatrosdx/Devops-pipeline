@@ -1,0 +1,16 @@
+<apex:page controller="TestObjectController">
+    <apex:form >
+        <apex:pageMessages />
+        
+        <apex:pageBlock title="Create New TestObject">
+            <apex:pageBlockSection >
+                <apex:inputField value="{!newTestObject.Name}" required="true" label="Name"/>
+                <apex:inputField value="{!newTestObject.TestItem__c}" required="true" label="TestItem__c"/>
+            </apex:pageBlockSection>
+
+            <apex:pageBlockButtons >
+                <apex:commandButton value="Save" action="{!save}" />
+            </apex:pageBlockButtons>
+        </apex:pageBlock>
+    </apex:form>
+</apex:page>

@@ -1,0 +1,20 @@
+<template>
+    <lightning-card title="取引先LWC検索画面" icon-name="standard:account">
+        <div class="slds-m-around_medium">
+            <lightning-input type="text" label="名前" value={accountName} onchange={handleNameChange} ></lightning-input>
+        </div>
+        <div>
+            <lightning-button variant="brand" label="検索" onclick={handleSearch}></lightning-button>
+        </div>
+
+        <template if:true={accounts}>
+            <lightning-datatable
+                key-field="Id"
+                data={accounts}
+                columns={columns}
+                >
+            </lightning-datatable>
+        </template>
+
+    </lightning-card>
+</template>

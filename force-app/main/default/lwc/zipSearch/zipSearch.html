@@ -1,0 +1,18 @@
+<template>
+    <lightning-card title="郵便番号による住所検索画面">
+        <div class="slds-m-around_medium">
+            <lightning-input type="text" label="郵便番号" value={zip} onchange={handleZipChange} max-length="7" min-length="7" placeholder="ハイフン抜き数字7桁で入力してください"></lightning-input>
+        </div>
+        <div>
+            <lightning-button variant="brand" label="検索" onclick={handleSearch}></lightning-button>
+        </div>
+
+        <template if:true={zipInfo}>
+            <div class="slds-m-around_medium">
+                <p>こちらの郵便番号の住所は以下です</p>
+                <p>住所： {address}</p>
+                <p>住所カナ： {addresskana}</p>
+            </div>
+        </template>
+    </lightning-card>
+</template>

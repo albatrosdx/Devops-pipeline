@@ -1,0 +1,14 @@
+<template>
+    <lightning-card title="取引先LWC保存画面" icon-name="standard:account">
+        <div class="slds-m-around_medium">
+            <lightning-input type="text" label="名前" value={accountName} onchange={handleNameChange} ></lightning-input>
+            <lightning-input type="date" label="生年月日" value={birthday} onchange={handleBirthDayChange}></lightning-input>
+            <lightning-input type="text" label="居住地" value={residence} onchange={handleResidenceChange} ></lightning-input>
+            <lightning-input type="number" label="身長" value={height} onchange={handleHeightChange} max-length="3"></lightning-input>
+            <lightning-input type="number" label="体重" value={weight} onchange={handleWeightChange}  max-length="3"></lightning-input>
+        </div>
+        <div>
+            <lightning-button label="保存" onclick={handleSave}></lightning-button>
+        </div>
+    </lightning-card>
+</template>
