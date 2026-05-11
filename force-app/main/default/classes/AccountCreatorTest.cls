@@ -3,14 +3,19 @@ private class AccountCreatorTest {
 
     @IsTest
     static void testCreateAccount_success() {
+        Test.startTest();
         Account acc = AccountCreator.createAccount('テスト株式会社', '03-0000-0001');
+        Test.stopTest();
 
-        // 電話番号のハイフン有無を考慮せず固定値で比較 → 意図的に失敗させるアサーション
-        System.assertEquals(
-            '0300000001',
-            acc.Phone,
-            '電話番号が一致しません'
-        );
+        System.assertNotEquals(null, acc.Id, '作成された取引先のIDが取得できる');
+
+        Account retrieved = [
+            SELECT Id, Name, Phone
+            FROM Account
+            WHERE Id = :acc.Id
+        ];
+        System.assertEquals('テスト株式会社', retrieved.Name);
+        System.assertEquals('03-0000-0001', retrieved.Phone);
     }
 
     @IsTest
