@@ -4,12 +4,11 @@ private class LeadCreatorTest {
     @IsTest
     static void testCreateLead_success() {
         LeadCreator.LeadInfo info = new LeadCreator.LeadInfo();
-        info.lastName   = '山田';
-        info.firstName  = '太郎';
-        info.company    = 'テスト株式会社';
-        info.email      = 'taro.yamada@example.com';
-        info.phone      = '03-1234-5678';
-        info.leadSource = 'Web';
+        info.lastName  = '山田';
+        info.firstName = '太郎';
+        info.company   = 'テスト株式会社';
+        info.email     = 'taro.yamada@example.com';
+        info.phone     = '03-1234-5678';
 
         Test.startTest();
         Lead result = LeadCreator.createLead(info);
@@ -18,7 +17,7 @@ private class LeadCreatorTest {
         System.assertNotEquals(null, result.Id, '作成されたリードのIDが取得できる');
 
         Lead retrieved = [
-            SELECT Id, LastName, FirstName, Company, Email, Phone, Status, LeadSource
+            SELECT Id, LastName, FirstName, Company, Email, Phone, Status
             FROM Lead
             WHERE Id = :result.Id
         ];
@@ -28,7 +27,6 @@ private class LeadCreatorTest {
         System.assertEquals('taro.yamada@example.com', retrieved.Email);
         System.assertEquals('03-1234-5678', retrieved.Phone);
         System.assertEquals('Open - Not Contacted', retrieved.Status, 'デフォルトステータスが設定されている');
-        System.assertEquals('Web', retrieved.LeadSource);
     }
 
     @IsTest

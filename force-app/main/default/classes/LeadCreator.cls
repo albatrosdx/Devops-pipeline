@@ -7,20 +7,18 @@ public with sharing class LeadCreator {
         public String email;
         public String phone;
         public String status;
-        public String leadSource;
     }
 
     public static Lead createLead(LeadInfo info) {
         validateInfo(info);
 
         Lead newLead = new Lead(
-            LastName   = info.lastName,
-            FirstName  = info.firstName,
-            Company    = info.company,
-            Email      = info.email,
-            Phone      = info.phone,
-            Status     = String.isBlank(info.status) ? 'Open - Not Contacted' : info.status,
-            LeadSource = info.leadSource
+            LastName  = info.lastName,
+            FirstName = info.firstName,
+            Company   = info.company,
+            Email     = info.email,
+            Phone     = info.phone,
+            Status    = String.isBlank(info.status) ? 'Open - Not Contacted' : info.status
         );
         insert newLead;
         return newLead;
@@ -35,13 +33,12 @@ public with sharing class LeadCreator {
         for (LeadInfo info : infos) {
             validateInfo(info);
             leads.add(new Lead(
-                LastName   = info.lastName,
-                FirstName  = info.firstName,
-                Company    = info.company,
-                Email      = info.email,
-                Phone      = info.phone,
-                Status     = String.isBlank(info.status) ? 'Open - Not Contacted' : info.status,
-                LeadSource = info.leadSource
+                LastName  = info.lastName,
+                FirstName = info.firstName,
+                Company   = info.company,
+                Email     = info.email,
+                Phone     = info.phone,
+                Status    = String.isBlank(info.status) ? 'Open - Not Contacted' : info.status
             ));
         }
         insert leads;
