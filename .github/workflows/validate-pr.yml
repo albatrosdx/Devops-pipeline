@@ -37,7 +37,10 @@ jobs:
       - name: Install sfdx-git-delta plugin
         run: |
           echo y | sf plugins install sfdx-git-delta
-          sf sgd --version
+          # インストール確認: プラグイン一覧で sfdx-git-delta が表示されればOK
+          sf plugins
+          # 実コマンドが利用可能か確認 (sgd 自体はトピック名なのでサブコマンドのhelpで確認)
+          sf sgd source delta --help
 
       # -------------------------------------------------------
       # 4. JWT認証で本番組織へ接続
