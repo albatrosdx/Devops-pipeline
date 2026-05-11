@@ -61,10 +61,11 @@ jobs:
           printf '%s' "$JWT_KEY" > server.key
           chmod 600 server.key
 
-          # 鍵フォーマットの簡易チェック (デバッグ用・秘密情報は出力しない)
+          # 鍵フォーマットの簡易チェック (秘密情報は一切出力しない)
           if ! head -1 server.key | grep -qE "^-----BEGIN (RSA )?PRIVATE KEY-----$"; then
             echo "::error::server.keyの先頭が PEMヘッダではありません。Secretの登録内容を確認してください。"
-            head -1 server.key
+            # 鍵の中身は一切出さず、行数のみ表示
+            echo "File lines: $(wc -l < server.key)"
             exit 1
           fi
           echo "Key lines: $(wc -l < server.key)"
