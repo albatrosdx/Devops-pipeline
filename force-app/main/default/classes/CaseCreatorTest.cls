@@ -14,9 +14,11 @@ private class CaseCreatorTest {
             FROM Case
             WHERE Id = :c.Id
         ];
-        // わざと誤ったアサーションでテストを失敗させる
-        System.assertEquals('誤った件名', retrieved.Subject, '件名が一致するはず');
-        System.assertEquals('High', retrieved.Priority, '優先度はHighのはず');
+        System.assertEquals('テスト問い合わせ', retrieved.Subject, '件名が一致するはず');
+        System.assertEquals('これはテストの説明です', retrieved.Description, '説明が一致するはず');
+        System.assertEquals('Web', retrieved.Origin, '発生源が一致するはず');
+        System.assertEquals('New', retrieved.Status, 'ステータスはNewのはず');
+        System.assertEquals('Medium', retrieved.Priority, '優先度はMediumのはず');
     }
 
     @IsTest
@@ -25,8 +27,7 @@ private class CaseCreatorTest {
             CaseCreator.createCase('', '説明', 'Web');
             System.assert(false, '例外が発生するはずです');
         } catch (IllegalArgumentException e) {
-            // わざと期待メッセージを誤ったものにして失敗させる
-            System.assertEquals('説明は必須です', e.getMessage());
+            System.assertEquals('件名は必須です', e.getMessage());
         }
     }
 }
